@@ -19,6 +19,7 @@ namespace SpinningDonut
         // Aspect ratio correction for Consolas (width:height ≈ 1 : 1.8)
         private const double ASPECT = 0.55;
 
+        // I found the sweeet spot to be 70x40 for Consolas at 12pt font size
         public DonutAnimator(TextBlock target, int width = 80, int height = 24)
         {
             _target = target ?? throw new ArgumentNullException(nameof(target));
