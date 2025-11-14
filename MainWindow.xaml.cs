@@ -1,27 +1,22 @@
 ﻿using System.Windows;
 
-namespace CognitiveCycleTimer;
-
-public partial class MainWindow : Window
+namespace SpinningDonut
 {
-    private DonutAnimator? _animator;
-
-    public MainWindow()
+    public partial class MainWindow : Window
     {
-        InitializeComponent();
-        Loaded += MainWindow_Loaded;
-        Unloaded += MainWindow_Unloaded;
-    }
+        private DonutAnimator _animator;
 
-    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
-    {
-        // Adjust width/height as needed to fit your TextBlock size
-        _animator = new DonutAnimator(DonutText, width: 40, height: 24, fps: 30);
-        _animator.Start();
-    }
+        public MainWindow()
+        {
+            InitializeComponent();
 
-    private void MainWindow_Unloaded(object sender, RoutedEventArgs e)
-    {
-        _animator?.Stop();
+            // Try smaller / larger sizes if needed (width: 60–100, height: 20–35)
+            // I found the sweeet spot to be 70x40 for Consolas at 12pt font size
+            _animator = new DonutAnimator(DonutTextBlock, width: 60, height: 35);
+
+            Loaded += (_, __) => _animator.Start();
+            Unloaded += (_, __) => _animator.Stop();
+            Closed += (_, __) => _animator.Stop();
+        }
     }
 }
