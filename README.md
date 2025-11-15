@@ -19,4 +19,4 @@ The project is built in C# using WPF (.NET), with the animation handled by a cus
 
 ## Example Screenshot
 
-![Application Screenshot](resources/screenshot.png)
+![Application Screenshot](resources/showcase.gif)
