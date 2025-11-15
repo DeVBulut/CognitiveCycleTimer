@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace SpinningDonut
@@ -16,6 +18,7 @@ namespace SpinningDonut
         public MainWindow()
         {
             InitializeComponent();
+            SizeChanged += MainWindow_SizeChanged;
 
             _animator = new DonutAnimator(DonutTextBlock, width: 60, height: 35);
 
@@ -75,5 +78,46 @@ namespace SpinningDonut
         {
             TimerDisplay.Text = _remaining.ToString(@"mm\:ss");
         }
+
+        private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (TopViewbox == null)
+                return;
+
+            // Get actual scale the Viewbox wants to apply
+            var transform = TopViewbox.LayoutTransform as ScaleTransform;
+
+            if (transform == null)
+            {
+                transform = new ScaleTransform(1, 1);
+                TopViewbox.LayoutTransform = transform;
+            }
+
+            // Extract the natural scale that Viewbox computed internally
+            double naturalScale = GetViewboxScale(TopViewbox);
+
+            // Enforce minimum scale
+            double minScale = 0.7; // <--- adjust here (0.7 feels great)
+
+            double finalScale = Math.Max(naturalScale, minScale);
+
+            transform.ScaleX = finalScale;
+            transform.ScaleY = finalScale;
+        }
+
+        private double GetViewboxScale(Viewbox vb)
+        {
+            if (vb.Child == null)
+                return 1.0;
+
+            // How much width scale is needed
+            double sx = vb.ActualWidth / vb.Child.DesiredSize.Width;
+            double sy = vb.ActualHeight / vb.Child.DesiredSize.Height;
+
+            // Viewbox Stretch="Uniform" means scale = min(sx, sy)
+            return Math.Min(sx, sy);
+        }
+
+
     }
 }

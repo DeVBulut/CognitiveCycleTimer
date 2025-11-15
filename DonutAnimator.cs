@@ -10,8 +10,8 @@ namespace SpinningDonut
         private readonly TextBlock _target;
         private readonly DispatcherTimer _timer;
 
-        private readonly int _width;
-        private readonly int _height;
+        private int _width;
+        private int _height;
 
         private double _A;
         private double _B;
@@ -55,6 +55,12 @@ namespace SpinningDonut
         private void OnTick(object sender, EventArgs e)
         {
             _target.Text = RenderFrame();
+        }
+
+        public void Resize(int width, int height)
+        {
+            _width = Math.Max(20, width);
+            _height = Math.Max(10, height);
         }
 
         private string RenderFrame()
