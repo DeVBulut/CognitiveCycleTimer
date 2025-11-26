@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -12,8 +13,14 @@ namespace SpinningDonut
 
         // Timer fields
         private readonly DispatcherTimer _timer;
+        private readonly MediaPlayer _alarmPlayer;
+        private readonly string _alarmFolder;
+
+        private static readonly string[] AlarmExtensions = { ".mp3", ".wav", ".wma", ".aac", ".m4a" };
+
         private TimeSpan _remaining;
         private bool _isRunning;
+        private bool _alarmActive;
 
         public MainWindow()
         {
@@ -27,6 +34,13 @@ namespace SpinningDonut
             _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _timer.Tick += Timer_Tick;
 
+            // Alarm setup
+            _alarmPlayer = new MediaPlayer();
+            _alarmPlayer.MediaEnded += AlarmPlayer_MediaEnded;
+
+            _alarmFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "resources", "alarms");
+            Directory.CreateDirectory(_alarmFolder);
+
             _remaining = TimeSpan.FromMinutes(25);
             UpdateTimerDisplay();
 
@@ -39,6 +53,8 @@ namespace SpinningDonut
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
+            StopAlarm();
+
             if (_remaining.TotalSeconds > 0)
             {
                 _timer.Start();
@@ -51,6 +67,7 @@ namespace SpinningDonut
         {
             _timer.Stop();
             _animator.Stop();
+            StopAlarm();
             _isRunning = false;
         }
 
@@ -58,6 +75,7 @@ namespace SpinningDonut
         {
             _timer.Stop();
             _animator.Stop();
+            StopAlarm();
             _animator.Reset();              
             _isRunning = false;
 
@@ -67,17 +85,32 @@ namespace SpinningDonut
 
         private void Timer_Tick(object sender, EventArgs e)
         {
-            if (_remaining.TotalSeconds > 0)
+            if (_remaining.TotalSeconds <= 0)
             {
-                _remaining = _remaining.Subtract(TimeSpan.FromSeconds(1));
+                HandleTimerCompleted();
+                return;
+            }
+
+            _remaining = _remaining.Subtract(TimeSpan.FromSeconds(1));
+
+            if (_remaining.TotalSeconds <= 0)
+            {
+                _remaining = TimeSpan.Zero;
                 UpdateTimerDisplay();
+                HandleTimerCompleted();
             }
             else
             {
-                _timer.Stop();
-                _animator.Stop();
-                _isRunning = false;
+                UpdateTimerDisplay();
             }
+        }
+
+        private void HandleTimerCompleted()
+        {
+            _timer.Stop();
+            _animator.Stop();
+            _isRunning = false;
+            StartAlarm();
         }
 
         private void UpdateTimerDisplay()
@@ -116,6 +149,64 @@ namespace SpinningDonut
             double sy = vb.ActualHeight / vb.Child.DesiredSize.Height;
 
             return Math.Min(sx, sy); // Uniform scaling
+        }
+
+        private void StartAlarm()
+        {
+            if (_alarmActive)
+                return;
+
+            Directory.CreateDirectory(_alarmFolder);
+
+            string? alarmFile = FindFirstAlarmSound();
+            if (alarmFile == null)
+                return;
+
+            try
+            {
+                _alarmPlayer.Open(new Uri(alarmFile));
+                _alarmPlayer.Position = TimeSpan.Zero;
+                _alarmPlayer.Play();
+                _alarmActive = true;
+            }
+            catch
+            {
+                _alarmActive = false; // Ignore playback errors silently
+            }
+        }
+
+        private void StopAlarm()
+        {
+            if (!_alarmActive)
+                return;
+
+            _alarmPlayer.Stop();
+            _alarmPlayer.Close();
+            _alarmActive = false;
+        }
+
+        private string? FindFirstAlarmSound()
+        {
+            foreach (var file in Directory.EnumerateFiles(_alarmFolder))
+            {
+                string extension = Path.GetExtension(file);
+                foreach (var allowedExt in AlarmExtensions)
+                {
+                    if (string.Equals(extension, allowedExt, StringComparison.OrdinalIgnoreCase))
+                        return Path.GetFullPath(file);
+                }
+            }
+
+            return null;
+        }
+
+        private void AlarmPlayer_MediaEnded(object? sender, EventArgs e)
+        {
+            if (!_alarmActive)
+                return;
+
+            _alarmPlayer.Position = TimeSpan.Zero;
+            _alarmPlayer.Play();
         }
     }
 }

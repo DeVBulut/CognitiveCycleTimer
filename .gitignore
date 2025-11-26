@@ -47,3 +47,11 @@ _ReSharper*/
 
 # Local configuration
 appsettings.Development.json
+
+# Alarm Media
+.mp3
+.wav
+.wma
+.aac
+.m4a
+alarms/
