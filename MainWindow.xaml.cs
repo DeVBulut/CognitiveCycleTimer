@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -21,13 +22,15 @@ namespace SpinningDonut
         private TimeSpan _remaining;
         private bool _isRunning;
         private bool _alarmActive;
+        private string? _selectedAlarmPath;
 
         public MainWindow()
         {
             InitializeComponent();
             SizeChanged += MainWindow_SizeChanged;
+            Loaded += MainWindow_Loaded;
 
-            // Create donut animator (fixed grid size – viewbox handles scaling)
+            // Create donut animator (fixed grid size - viewbox handles scaling)
             _animator = new DonutAnimator(DonutTextBlock, width: 60, height: 35);
 
             // Timer setup
@@ -48,8 +51,14 @@ namespace SpinningDonut
             StartButton.Click += StartButton_Click;
             PauseButton.Click += PauseButton_Click;
             ClearButton.Click += ClearButton_Click;
+            TestButton.Click += TestButton_Click;
+            AlarmSelector.SelectionChanged += AlarmSelector_SelectionChanged;
         }
 
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            RefreshAlarmList();
+        }
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
@@ -81,6 +90,23 @@ namespace SpinningDonut
 
             _remaining = TimeSpan.FromMinutes(25);
             UpdateTimerDisplay();
+        }
+
+        private void TestButton_Click(object sender, RoutedEventArgs e)
+        {
+            StopAlarm();
+            _timer.Stop();
+            _animator.Stop();
+
+            _remaining = TimeSpan.FromSeconds(10);
+            UpdateTimerDisplay();
+
+            if (_remaining.TotalSeconds > 0)
+            {
+                _timer.Start();
+                _animator.Start();
+                _isRunning = true;
+            }
         }
 
         private void Timer_Tick(object sender, EventArgs e)
@@ -156,9 +182,7 @@ namespace SpinningDonut
             if (_alarmActive)
                 return;
 
-            Directory.CreateDirectory(_alarmFolder);
-
-            string? alarmFile = FindFirstAlarmSound();
+            string? alarmFile = GetAlarmFileToUse();
             if (alarmFile == null)
                 return;
 
@@ -185,19 +209,72 @@ namespace SpinningDonut
             _alarmActive = false;
         }
 
-        private string? FindFirstAlarmSound()
+        private string? GetAlarmFileToUse()
         {
-            foreach (var file in Directory.EnumerateFiles(_alarmFolder))
+            if (!string.IsNullOrWhiteSpace(_selectedAlarmPath) && File.Exists(_selectedAlarmPath))
+                return _selectedAlarmPath;
+
+            RefreshAlarmList();
+            return _selectedAlarmPath;
+        }
+
+        private bool IsAllowedAlarmFile(string filePath)
+        {
+            string extension = Path.GetExtension(filePath);
+            return AlarmExtensions.Any(ext => string.Equals(extension, ext, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private void RefreshAlarmList()
+        {
+            Directory.CreateDirectory(_alarmFolder);
+
+            var files = Directory
+                .EnumerateFiles(_alarmFolder)
+                .Where(IsAllowedAlarmFile)
+                .OrderBy(Path.GetFileName)
+                .ToList();
+
+            AlarmSelector.SelectionChanged -= AlarmSelector_SelectionChanged;
+            AlarmSelector.Items.Clear();
+
+            if (files.Count == 0)
             {
-                string extension = Path.GetExtension(file);
-                foreach (var allowedExt in AlarmExtensions)
+                AlarmSelector.Items.Add(new ComboBoxItem
                 {
-                    if (string.Equals(extension, allowedExt, StringComparison.OrdinalIgnoreCase))
-                        return Path.GetFullPath(file);
-                }
+                    Content = "No alarm files found",
+                    IsEnabled = false
+                });
+                AlarmSelector.SelectedIndex = 0;
+                AlarmSelector.IsEnabled = false;
+                _selectedAlarmPath = null;
+
+                AlarmSelector.SelectionChanged += AlarmSelector_SelectionChanged;
+                return;
             }
 
-            return null;
+            AlarmSelector.IsEnabled = true;
+
+            string desiredSelection = _selectedAlarmPath ?? files[0];
+            if (!files.Any(f => string.Equals(f, desiredSelection, StringComparison.OrdinalIgnoreCase)))
+                desiredSelection = files[0];
+
+            foreach (var file in files)
+            {
+                var item = new ComboBoxItem
+                {
+                    Content = Path.GetFileName(file),
+                    Tag = Path.GetFullPath(file)
+                };
+
+                AlarmSelector.Items.Add(item);
+
+                if (string.Equals(file, desiredSelection, StringComparison.OrdinalIgnoreCase))
+                    AlarmSelector.SelectedItem = item;
+            }
+
+            _selectedAlarmPath = (AlarmSelector.SelectedItem as ComboBoxItem)?.Tag as string ?? files[0];
+
+            AlarmSelector.SelectionChanged += AlarmSelector_SelectionChanged;
         }
 
         private void AlarmPlayer_MediaEnded(object? sender, EventArgs e)
@@ -207,6 +284,14 @@ namespace SpinningDonut
 
             _alarmPlayer.Position = TimeSpan.Zero;
             _alarmPlayer.Play();
+        }
+
+        private void AlarmSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (AlarmSelector.SelectedItem is ComboBoxItem item && item.Tag is string path)
+            {
+                _selectedAlarmPath = path;
+            }
         }
     }
 }
